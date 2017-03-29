@@ -1,0 +1,56 @@
+from __future__ import division,print_function
+import numpy as np
+import scipy
+import sys
+import os
+from os.path import expanduser
+import matplotlib.pyplot as plt
+import pandas as pd
+import gatspy.periodic as gp
+from scipy.optimize import fsolve
+from scipy.optimize import curve_fit
+
+#need period, ecc, time, w, rvsys, t0
+#tan(f/2)=np.sqrt((1+e)/(1-e))*tan(E/2)
+#n=(2*np.pi)/period
+#E-(e*np.sin(E))=n(time-T)
+#v=rvsys+K*(np.cos(f+w)+e*np.cos(w))
+
+def rv_pl(time,rvsys, K, w, ecc, T, period):
+	w=np.radians(w)
+	n=(2*np.pi)/period
+	M=n*(time-T)
+	E=np.zeros(len(M))
+	for ii,element in enumerate(M): # compute eccentric anomaly
+		E[ii] = fsolve(lambda x: element- x+ecc*np.sin(x) ,element)
+	f=2*np.arctan2(np.sqrt((1+ecc))*np.sin(0.5*E),np.sqrt(1-ecc)*np.cos(0.5*E))
+
+	V=rvsys+K*(np.cos(w+f)+(ecc*np.cos(w)))
+	return V
+
+#Time	RV		eRV
+#BJD	m/s		m/s
+rv=pd.read_csv('KOI-3890_rv.txt')
+rv['Time']-=2400000
+
+rv['RV']/=1e3
+rv['eRV']/=1e3
+
+plt.plot(rv['Time'],rv['RV'],'.')
+plt.show()
+
+initial=[200,11000,100,0.6,10,150]
+mod_time=np.linspace(min(rv['Time']),max(rv['Time']),1000)
+
+
+popt, pcov = curve_fit(rv_pl, rv['Time'], rv['RV'],p0=initial,maxfev=10000)
+print(np.c_[popt,np.sqrt(np.diag(pcov))])
+plt.plot(rv['Time'],rv['RV'],'.')
+plt.plot(mod_time,rv_pl(mod_time,*popt),'r--')
+plt.show()
+
+
+
+
+
+

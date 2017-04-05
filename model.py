@@ -1,6 +1,4 @@
 from __future__ import division,print_function
-import numpy as np
-import scipy
 import sys
 import os
 from os.path import expanduser
@@ -10,9 +8,6 @@ from ajplanet import pl_rv_array as rv_curve
 import gatspy.periodic as gp
 from scipy.optimize import fsolve
 from scipy import optimize
-from ajplanet import pl_true_anomaly as tru
-import time as clock
-
 
 #need period, ecc, time, w, rvsys, t0
 #tan(f/2)=np.sqrt((1+e)/(1-e))*tan(E/2)
@@ -20,12 +15,7 @@ import time as clock
 #E-(e*np.sin(E))=n(time-T)
 #v=rvsys+K*(np.cos(f+w)+e*np.cos(w))
 
-def get_rv(params,time):
-	rvsys, K, w, ecc, T0, period=params
-	model=rv_curve(time,rvsys, K, np.deg2rad(w), ecc, T0, period)
-	return model
-
-def rv_pl(params,time):
+def rv_pl(time,params):
 	rvsys, K, w, ecc, T, period=params
 	w=np.radians(w)
 	n=(2*np.pi)/period

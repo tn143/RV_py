@@ -16,8 +16,6 @@ import gatspy.periodic as gp
 from tqdm import tqdm
 from time import sleep
 
-
-
 home=expanduser('~')
 
 
@@ -68,7 +66,6 @@ def rv_pl(time,params):
 
 	V=rvsys+K*(np.cos(w+f)+(ecc*np.cos(w)))
 	return V
-
 
 # Define the probability function as likelihood * prior.
 def lnprior(theta):

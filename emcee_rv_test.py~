@@ -185,19 +185,6 @@ np.savetxt('RV_results.txt',np.c_[np.array(labels),medians,uerr,lerr],fmt='%s',h
 for i in range(0,len(labels)):
 	print(labels[i],medians[i],'+/-',np.mean((uerr[i],lerr[i])))
 
-rvsys, K, w, ecc, T0, period=medians
-ervsys,eK,ew,eecc,eT0,eperiod=np.mean((uerr,lerr),axis=0)
-time_mod=np.arange(time.min(),time.max(),0.5)
-
-phase=((time-T0)/period)%1
-phase_mod=((time_mod-T0)/period)%1
-
-idx=np.argsort(phase_mod)
-plt.errorbar(phase,rv,erv,fmt='k.')
-plt.plot(phase_mod[idx],rv_pl(medians,time_mod)[idx],'r')
-plt.xlabel('Phase')
-plt.ylabel('Radial Velocity (km/s)')
-plt.show()
-
-
+#rvsys, K, w, ecc, T0, period=medians
+#ervsys,eK,ew,eecc,eT0,eperiod=np.mean((uerr,lerr),axis=0)
 

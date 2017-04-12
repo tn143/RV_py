@@ -16,31 +16,7 @@ import gatspy.periodic as gp
 from tqdm import tqdm
 from time import sleep
 
-
-
 home=expanduser('~')
-
-
-def lomb(time,flux,Nf=50):
-	print(type(time[0]),type(flux[0]))
-	#time=time.values
-	#flux=flux.values
-	time=time-time[0]
-
-	if time[1]<1:
-		time=time*86400
-
-	c=[]
-	for i in range(len(time)-1):
-		c.append(time[i+1]-time[i])
-	c=np.median(c)
-	nyq=1/(2*(time[1]-time[0]))
-	nyq=1/(2*c)
-	df=1/time[-1]
-
-	f,p=gp.lomb_scargle_fast.lomb_scargle_fast(time,flux,f0=0,df=df,Nf=Nf*(nyq/df))
-	t=1/f
-	return t,p
 
 def phase(time, period, origo=0.0, shift=0.5):
     return (((time - origo)/period + shift) % 1.)-0.5
@@ -68,7 +44,6 @@ def rv_pl(time,params):
 
 	V=rvsys+K*(np.cos(w+f)+(ecc*np.cos(w)))
 	return V
-
 
 # Define the probability function as likelihood * prior.
 def lnprior(theta):
@@ -126,9 +101,26 @@ rv=rv[idx]
 erv=erv[idx]
 mod_time=np.linspace(min(time),max(time),1e4)
 
+from gatspy.periodic import LombScargleFast
+N = 10000
+periods=np.linspace(1,max(time)/2,N)
+fmin = 1. / periods.max()
+fmax = 1. / periods.min()
+df = (fmax - fmin) / N
+
+model = LombScargle().fit(time, rv, erv)
+power = model.score_frequency_grid(fmin, df, N)
+freqs = fmin + df * np.arange(N)
+
+# plot the results
+plt.plot(1. / freqs, power)
+plt.show()
+
+sys.exit()
+
 #rvsys, K, w, ecc, T0, period
 labels=['rvsys', 'K', 'w', 'ecc', 'T0', 'period']
-initial=[4,10,108.5,0.61,57324,152.83]
+initial=[0,0,180,0.0,time[rv==min(rv)],100]
 
 plt.errorbar(time,rv,erv,fmt='.')
 plt.plot(mod_time,rv_pl(mod_time,initial))
@@ -136,27 +128,22 @@ plt.show()
 
 
 # Set up the sampler.
-ntemps, nwalkers, niter, ndim = 1, 100, 500, len(labels)
+ntemps, nwalkers, niter, ndim = 1, 100, 100, len(labels)
 sampler = emcee.PTSampler(ntemps, nwalkers, ndim, lnlike, lnprior, loglargs=(time, rv, erv))
-
 p0 = np.zeros([ntemps, nwalkers, ndim])
 for i in range(ntemps):
     for j in range(nwalkers):
-	p0[i,j,:] = initial + 1e-2*np.random.randn(ndim)
+	p0[i,j,:] = initial + 1e-1*np.random.randn(ndim)
 
 print('... burning in ...')
 for p, lnprob, lnlike in tqdm(sampler.sample(p0, iterations=niter),total=niter):
 	sleep(0.001)
 
 # Clear and run the production chain.
-sampler.reset()
+#sampler.reset()
 print('... running sampler ...')
-for p, lnprob, lnlike in tqdm(sampler.sample(p, lnprob0=lnprob,
-				                  lnlike0=lnlike,
-				                  iterations=niter),total=niter):
-	
+for p, lnprob, lnlike in tqdm(sampler.sample(p, lnprob0=lnprob,lnlike0=lnlike,iterations=niter),total=niter):
 	sleep(0.001)
-
 
 fig, axes = plt.subplots(len(labels), 1, sharex=True, figsize=(8, 9))
 

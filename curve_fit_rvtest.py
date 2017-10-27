@@ -16,22 +16,23 @@ from scipy.optimize import curve_fit
 #E-(e*np.sin(E))=n(time-T)
 #v=rvsys+K*(np.cos(f+w)+e*np.cos(w))
 
-def rv_pl(time,rvsys, K, w, ecc, T, period):
+def rv_pl(time,params):
+	rvsys, K, w, ecc, T, period=params
 	w=np.radians(w)
-	if w<0:
-		w=w+(2*np.pi)
-	if ecc<0:
-		ecc=np.abs(ecc)
-
-	print(ecc,np.rad2deg(w))
 	n=(2*np.pi)/period
 	M=n*(time-T)
 	E=np.zeros(len(M))
-	for ii,element in enumerate(M): # compute eccentric anomaly
-		E[ii] = fsolve(lambda x: element- x+ecc*np.sin(x) ,element)
-	f=2*np.arctan2(np.sqrt((1+ecc))*np.sin(0.5*E),np.sqrt(1-ecc)*np.cos(0.5*E))
+	if ecc==0:
+		V=rvsys+K*(np.cos(w+M))
+	else:
+		if len(time)<150:
+			E= fsolve(lambda x: x-ecc*np.sin(x) - M,M)#slower for N >~230
+		else:
+			for ii,element in enumerate(M): # compute eccentric anomaly
+				E[ii] = fsolve(lambda x: element- x+ecc*np.sin(x) ,element)
 
-	V=rvsys+K*(np.cos(w+f)+(ecc*np.cos(w)))
+		f=2*np.arctan2(np.sqrt((1+ecc))*np.sin(0.5*E),np.sqrt(1-ecc)*np.cos(0.5*E))
+		V=rvsys+K*(np.cos(w+f)+(ecc*np.cos(w)))
 	return V
 
 #Time	RV		eRV
@@ -57,9 +58,9 @@ erv+=np.random.normal(0,5,len(rv))#and random scatter of same level
 '''
 
 #Real
-#rv=pd.read_csv('hd212771.txt',comment='#',delim_whitespace=True)#MIKE
-#initial=[1,50,45,0.2,time[rv==min(rv)],365]
-
+rv=pd.read_csv('hd212771.txt',comment='#',delim_whitespace=True)#MIKE
+time,rv,erv=rv['Time'].values,rv['RV'].values,rv['eRV'].values
+initial=[1,50,45,0.2,time[rv==min(rv)],365]
 
 #rv=pd.read_csv('KOI-3890_rv.txt')
 #rv['Time']-=2400000
@@ -68,12 +69,9 @@ erv+=np.random.normal(0,5,len(rv))#and random scatter of same level
 #time,rv,erv=rv['Time'].values,rv['RV'].values,rv['eRV'].values
 
 #Real
-rv=pd.read_csv('hd206610.txt',comment='#',delim_whitespace=True)#HD 206610
-time,rv,erv=rv['Time'].values,rv['RV'].values,rv['eRV'].values
-
-
-
-initial=[20,40,270,0.15,time[rv==min(rv)],600]
+#rv=pd.read_csv('hd206610.txt',comment='#',delim_whitespace=True)#HD 206610
+#time,rv,erv=rv['Time'].values,rv['RV'].values,rv['eRV'].values
+#initial=[20,40,270,0.15,time[rv==min(rv)],600]
 
 mod_time=np.linspace(min(time),max(time),1e4)
 plt.errorbar(time,rv,erv,fmt='.')

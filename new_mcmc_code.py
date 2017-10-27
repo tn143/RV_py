@@ -17,6 +17,10 @@ from tqdm import tqdm
 from time import sleep
 from scipy import stats
 
+from gatspy.periodic import LombScargleFast
+from gatspy.periodic import LombScargle
+
+
 home=expanduser('~')
 
 def phase(time, period, origo=0.0, shift=0.5):
@@ -31,42 +35,46 @@ def phase(time, period, origo=0.0, shift=0.5):
 def rv_pl(time,params):
 	rvsys, K, w, ecc, T, period=params
 	w=np.radians(w)
-	if w<0:
-		w=w+(2*np.pi)
-	if ecc<0:
-		ecc=np.abs(ecc)
-
 	n=(2*np.pi)/period
 	M=n*(time-T)
 	E=np.zeros(len(M))
-	for ii,element in enumerate(M): # compute eccentric anomaly
-		E[ii] = fsolve(lambda x: element- x+ecc*np.sin(x) ,element)
-	f=2*np.arctan2(np.sqrt((1+ecc))*np.sin(0.5*E),np.sqrt(1-ecc)*np.cos(0.5*E))
+	if ecc==0:
+		V=rvsys+K*(np.cos(w+M))
+	else:
+		if len(time)<150:
+			E= fsolve(lambda x: x-ecc*np.sin(x) - M,M)#slower for N >~230
+		else:
+			for ii,element in enumerate(M): # compute eccentric anomaly
+				E[ii] = fsolve(lambda x: element- x+ecc*np.sin(x) ,element)
 
-	V=rvsys+K*(np.cos(w+f)+(ecc*np.cos(w)))
+		f=2*np.arctan2(np.sqrt((1+ecc))*np.sin(0.5*E),np.sqrt(1-ecc)*np.cos(0.5*E))
+		V=rvsys+K*(np.cos(w+f)+(ecc*np.cos(w)))
 	return V
 
 # Define the probability function as likelihood * prior.
 def lnprior(theta):
-	rvsys, K, w, ecc, T0, period = theta
-	ln_rvsys=stats.uniform(0,100)
-	ln_k=stats.uniform(0,500)
-	ln_w=stats.uniform(0,360)
-	ln_T=stats.uniform(0,1200)
-	ln_Per=stats.uniform(0,365)
-	ln_e=stats.beta(0.867,3.03)
-
-
-	logprior=ln_rvsys.logpdf(rvsys)+ln_k.logpdf(K)+ln_w.logpdf(w)+ln_T.logpdf(T0)+ln_Per.logpdf(period)+ln_e.logpdf(ecc)
-	#if 0 < rvsys < 1e6 and 0.0 < K < 500 and 0.0 < ecc < 1.0 and 0.0<w<360 and 0<T0<1e6 and 0.01<period<1e3:
-		#return 0.0
-	return logprior
+	rvsys, K, w, ecc, Tr, period,sig2 = theta
+	logsig2=np.log10(sig2)
+	logp=np.log10(period)
+	logr=np.log10(rvsys)
+	logk=np.log10(K)
+	sqrte=np.sqrt(ecc)
+	#if -100<rvsys<100 and -2 < logk < 3 and 0.0<w<360 and 30<period<50 and 0<Tr<100:
+	#	ln_e=stats.beta(0.867,3.03)
+	#	lnp_per=-0.5*(period-42.795)**2/(0.01**2)
+	#	return ln_e.logpdf(ecc)+lnp_per
+	if -100<rvsys<100 and -2 < logk < 3 and -1<sqrte*np.cos(np.deg2rad(w))<1 and -1<sqrte*np.sin(np.deg2rad(w))<1 and ecc<1\
+	and 0<Tr<45 and  6.2<period<6.3 and 0<w<360 and -10<logsig2<10:
+		lnp_per=-0.5*(period-6.2467)**2/(0.01**2)
+		return lnp_per
+	else:
+		return -np.inf
 
 def lnlike(theta, time, rv, erv):
-    rvsys, K, w, ecc, T0, period = theta
-    model =rv_pl(time,theta)
+    rvsys, K, w, ecc, T0, period,sig2 = theta
+    model =rv_pl(time,theta[:-1])
 
-    inv_sigma2 = 1.0/(erv**2)# + model**2)
+    inv_sigma2 = 1.0/(sig2**2+erv**2)# + model**2)
     return -0.5*(np.sum((rv-model)**2*inv_sigma2 - np.log(inv_sigma2)))
 
 def lnprob(theta, time, rv, erv):
@@ -75,40 +83,34 @@ def lnprob(theta, time, rv, erv):
 		return -np.inf
     return lp + lnlike(theta, time, rv, erv)
 
-#filerv='/Dropbox/PhD/Year_2/KOI-3890/Updated_Data/K03890.multi.txt'
-#filerv='/Dropbox/PhD/Year_3/Astrolab_2017_Exo_Proj/Data_Files/Kepler_93_rv_corr.txt'
-#filerv='/Dropbox/PhD/Year_3/Astrolab_2017_Exo_Proj/Data_Files/Kepler_93_rv.txt'
-#filerv='/Dropbox/PhD/Python Codes/Python_RV/hd206610.txt'
-
 #np.random.seed(14392)#meaning of life you know?!
 #Synthetic
-time=np.random.randint(0,365.25*1,10)
-time=np.sort(time)
-mod_time=np.linspace(0,5+max(time),1e4)
-#p=np.random.randint(0.2,365)#from 0.2days to 1 years
+#Nobs=9
+#time=np.random.uniform(0,150,Nobs)
+#time=np.sort(time)
 #rvsys, K, w, ecc, T, period
-#initial=[np.random.randint(10,20),np.random.randint(10,200),np.random.randint(0,360),np.random.random(),p*np.random.random(),p]#make the planet
-labels=['rvsys', 'K', 'w', 'ecc', 'T0', 'period']
-initial=[3,45,66.6,0.45,10.2,43.2]
-rvsys, K, w, ecc, T, period=initial
-rv=rv_pl(time,initial)#generate rv curve
-erv=np.random.normal(8,2,len(rv))#random errors ~10ms 
-rv+=np.random.normal(0,8,len(rv))#and random scatter of same level
+#initial=[5,45,100.8956,0.15,13.3345,42.795446754]
+#rvsys, K, w, ecc, T, period=initial
+#rv=rv_pl(time,initial)#generate rv curve
+#erv=2+0.2*np.random.rand(len(time))#random errors ~10ms 
+#rv+=erv*np.random.randn(len(time))
+#rv+=np.random.normal(0,5,len(rv))#and random scatter of same level jitter term
+#plt.plot(mod_time,rv_pl(mod_time,initial))
+
+
+time,rv,erv=np.loadtxt('./kepler91_rv.txt',skiprows=2,delimiter=' ',unpack=True,usecols=(0,1,2))
+time-=time[0]
+mod_time=np.linspace(min(time),max(time),1000)
+
 ##############################
 plt.errorbar(time,rv,yerr=erv,fmt='.')
-plt.plot(mod_time,rv_pl(mod_time,initial))
 plt.show()
 
-idx=np.argsort(time)
-time=time[idx]
-rv=rv[idx]
-erv=erv[idx]
-mod_time=np.linspace(min(time),max(time),1e4)
 
-from gatspy.periodic import LombScargleFast
-from gatspy.periodic import LombScargle
+
+####EXTRACT PERIOD ESTIMATE##############
 N = 10000
-periods=np.linspace(10,max(time)/2,N)
+periods=np.linspace(0.1,2*max(time),N)
 fmin = 1. / periods.max()
 fmax = 1. / periods.min()
 df = (fmax - fmin) / N
@@ -125,18 +127,21 @@ plt.show()
 print('guess p: ', periods[power==max(power)])
 print('guess sys v: ',np.mean(rv))
 print('guess K: ',np.std(rv-np.mean(rv)))
-print(np.c_[labels,initial])
 
 #rvsys, K, w, ecc, T0, period
-labels=['rvsys', 'K', 'w', 'ecc', 'T0', 'period']
-initial=[np.mean(rv),np.std(rv-np.mean(rv)),90,0.3,18,periods[power==max(power)]]
+labels=['rvsys', 'K', 'w', 'ecc', 'T0', 'period','sig2']
+initial=[0,40,90,0.01,15,6.25,20]
+
+#VALUES
+print(np.c_[labels,initial])
+
 
 plt.errorbar(time,rv,erv,fmt='.')
-plt.plot(mod_time,rv_pl(mod_time,initial))
+plt.plot(mod_time,rv_pl(mod_time,initial[:-1]))
 plt.show()
 
 # Set up the sampler.
-ntemps, nwalkers, niter, ndim = 2, 300, 500, len(labels)
+ntemps, nwalkers, niter, ndim = 2, 500, 2500, len(labels)
 sampler = emcee.PTSampler(ntemps, nwalkers, ndim, lnlike, lnprior, loglargs=(time, rv, erv))
 p0 = np.zeros([ntemps, nwalkers, ndim])
 for i in range(ntemps):
@@ -182,9 +187,8 @@ np.savetxt('RV_results.txt',np.c_[np.array(labels),medians,uerr,lerr],fmt='%s',h
 for i in range(0,len(labels)):
 	print(labels[i],medians[i],'+/-',np.mean((uerr[i],lerr[i])))
 
-rvsys, K, w, ecc, T0, period=medians
 plt.errorbar(time,rv,erv,fmt='.')
-plt.plot(mod_time,rv_pl(mod_time,medians))
+plt.plot(mod_time,rv_pl(mod_time,medians[:-1]))
 plt.show()
 
 

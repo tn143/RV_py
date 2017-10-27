@@ -57,8 +57,9 @@ erv+=np.random.normal(0,5,len(rv))#and random scatter of same level
 '''
 
 #Real
-#rv=pd.read_csv('hd212771.txt',comment='#',delim_whitespace=True)#MIKE
-#initial=[1,50,45,0.2,time[rv==min(rv)],365]
+rv=pd.read_csv('hd212771.txt',comment='#',delim_whitespace=True)#MIKE
+initial=[1,50,45,0.2,time[rv==min(rv)],365]
+time,rv,erv=rv['Time'].values,rv['RV'].values,rv['eRV'].values
 
 
 #rv=pd.read_csv('KOI-3890_rv.txt')
@@ -68,22 +69,16 @@ erv+=np.random.normal(0,5,len(rv))#and random scatter of same level
 #time,rv,erv=rv['Time'].values,rv['RV'].values,rv['eRV'].values
 
 #Real
-rv=pd.read_csv('hd206610.txt',comment='#',delim_whitespace=True)#HD 206610
-time,rv,erv=rv['Time'].values,rv['RV'].values,rv['eRV'].values
+#rv=pd.read_csv('hd206610.txt',comment='#',delim_whitespace=True)#HD 206610
+#time,rv,erv=rv['Time'].values,rv['RV'].values,rv['eRV'].values
+#initial=[20,40,270,0.15,time[rv==min(rv)],600]
 
 
 
-initial=[20,40,270,0.15,time[rv==min(rv)],600]
 
 
-initial=np.zeros(len(labels))
-initial[0]=np.median(rv)
-initial[1]=(max(rv)-initial[0])/2
-initial[2]=180
-initial[3]=0.2
-initial[4]=time[rv==min(rv)]
-initial[5]=150#raw_input('Period guess',)
-print(initial)
+
+
 
 mod_time=np.linspace(min(time),max(time),1e4)
 plt.errorbar(time,rv,erv,fmt='.')

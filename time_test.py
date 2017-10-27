@@ -9,7 +9,7 @@ import gatspy.periodic as gp
 from scipy.optimize import fsolve
 from scipy import optimize
 import numpy as np
-home=expanduser('~')
+import time as clock
 
 #need period, ecc, time, w, rvsys, t0
 #tan(f/2)=np.sqrt((1+e)/(1-e))*tan(E/2)
@@ -37,31 +37,20 @@ def rv_pl(time,params):
 	return V
 
 
+
 labels=['rvsys', 'K', 'w', 'ecc', 'T', 'period']
-params=[0,100,0,0.0,0,10]
-time=np.arange(0,15,0.001)
-rv=rv_pl(time,params)
+params=[10.1,15.3,87.5,0.92,1.2,15.1]
 
-t=np.random.uniform(0,15,20)
-r=rv_pl(t,params)
-er=np.random.normal(5,1,len(r))
-r=r+(er*np.random.normal(0,1,len(r)))
-
-plt.errorbar(t,r,yerr=er,fmt='.')
-plt.plot(time,rv)
-plt.axhline(y=0,ls='--',c='k',lw=1)
-
-plt.arrow(10,0,0,100,head_width=0.3, head_length=10,length_includes_head=True,overhang=0.5)
-plt.text(10.1,45,r'$K$',fontsize=32)
-
-plt.xticks(fontsize=18)
-plt.yticks(fontsize=20)
-plt.ylabel(r'Velocity (ms$^{-1}$)',fontsize=20)
-plt.xlabel('Time (days)',fontsize=20)
-plt.legend(loc='best')
-plt.tight_layout()
-plt.savefig(home+'/Dropbox/PhD/Year_4/Porto/RV.pdf')
+test=np.arange(2,200,1)
+for i in test:
+	print(i)
+	time=np.arange(0,i,0.1)
+	s1=clock.clock()
+	rv=rv_pl(time,params)
+	f1=clock.clock()
+	plt.plot(time,rv)
 plt.show()
+
 
 
 
